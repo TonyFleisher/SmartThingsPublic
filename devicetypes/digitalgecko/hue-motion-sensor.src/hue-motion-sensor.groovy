@@ -204,7 +204,7 @@ def parse(String description) {
         parsed=true
 	}
 	else if (description?.startsWith('read attr -')) {
-    log.trace "parse - read attr - ${description}"
+    //log.trace "parse - read attr - ${description}"
 		result = parseReportAttributeMessage(description).each { createEvent(it) }
         parsed=true
 	}
