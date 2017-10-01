@@ -397,14 +397,14 @@ private Map getSensitivityResult(value) {
     
     def descriptionText = '{{ device.displayName }} sensitivity {{ value }}'
 	
-    log.trace "Sdesc: ${sensitivityString}"
+    //log.trace "Sdesc: ${sensitivityString}"
     
     def result = [
 		name: 'sensitivity',
 		value: sensitivityString,
 		descriptionText: descriptionText,
 		translatable: true,
-        isStateChange: true
+        //isStateChange: true
 	]
     // log.debug "Sensitivity Result: {$result}"
     return result
