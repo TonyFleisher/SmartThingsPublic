@@ -24,8 +24,8 @@ metadata {
         capability "Illuminance Measurement" //0x0400
 
 command "setSensitivity"
-command "sensitivityUp"
-command "sensitivityDown"
+command "increaseSensitivity"
+command "decreaseSensitivity"
 command "sensitivityLow"
 command "sensitivityMed"
 command "sensitivityHigh"
@@ -58,11 +58,11 @@ attribute "sensitivity", "enum", ["low","medium","high", "unknown"]
 				attributeState "active", label:'motion', icon:"st.motion.motion.active", backgroundColor:"#53a7c0"
 				attributeState "inactive", label:'no motion', icon:"st.motion.motion.inactive", backgroundColor:"#ffffff"
 			}
-//            tileAttribute ("device.sensitivity", key: "VALUE_CONTROL") {
-//				attributeState "VALUE_UP", action: "sensitivityUp"
-//                attributeState "VALUE_DOWN", action: "sensitivityDown"
-			tileAttribute ("device.sensitivity", key: "SECONDARY_CONTROL") {
-				attributeState "sensitivity", label: "Sensitivity: ${ currentValue}"
+            tileAttribute ("device.sensitivity", key: "VALUE_CONTROL") {
+				attributeState "VALUE_UP", action: "increaseSensitivity"
+                attributeState "VALUE_DOWN", action: "decreaseSensitivity"
+//			tileAttribute ("device.sensitivity", key: "SECONDARY_CONTROL") {
+//				attributeState "sensitivity", label: 'Sensitivity: ${currentValue}'
             }
 		}
        
@@ -98,13 +98,13 @@ attribute "sensitivity", "enum", ["low","medium","high", "unknown"]
         }
         
         standardTile("sensitivityLow", "sensitivityLow", decoration: "flat", width: 2, height: 2) {
-			state "default", label:'Low', action: "sensitivityLow"
+			state "default", label:'Low\nSensitivity', action: "sensitivityLow"
 		}
         standardTile("sensitivityMed", "sensitivityMed", decoration: "flat", width: 2, height: 2) {
-			state "default", label:'Med', action: "sensitivityMed"
+			state "default", label:'Medium\nSensitivity', action: "sensitivityMed"
 		}
         standardTile("sensitivityHigh", "sensitivityHigh", decoration: "flat", width: 2, height: 2) {
-			state "default", label:'High', action: "sensitivityHigh"
+			state "default", label:'High\nSensitivity', action: "sensitivityHigh"
 		}
 
         main "motion"
