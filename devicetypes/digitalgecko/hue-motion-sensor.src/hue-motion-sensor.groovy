@@ -113,7 +113,7 @@ attribute "sensitivity", "enum", ["low","medium","high", "unknown"]
 }
 
 def setSensitivity(value = "NOVALUE") {
-	log.trace "SetSensitivity: ${value}"
+	log.debug "SetSensitivity: ${value}"
 	def cmds = []
 	cmds += writeSensitivityAttribute(value)
 	return cmds
@@ -155,7 +155,7 @@ def getSensitivity(){
 }
 
 def writeSensitivityAttribute(newValue) {
-    log.trace "Wrting sensitiviy: ${newValue}"
+    log.debug "Writing sensitiviy: ${newValue}"
     def cmds= []
     if(newValue == null || newValue > 0x02 || newValue < 0x00) { 
         log.debug "Invalid value for sensitivity: ${newValue}"
@@ -164,7 +164,7 @@ def writeSensitivityAttribute(newValue) {
     
     cmds += zigbee.writeAttribute(0x0406, 0x0030, 0x20, newValue, [mfgCode: 0x100b])
 
-	log.trace "writeSensitivity: ${ cmds }"
+	//log.trace "writeSensitivity: ${ cmds }"
 	return cmds
 }
 
@@ -219,7 +219,7 @@ def parse(String description) {
   Refresh Function
 */
 def refresh() {
-    return configCmds() + refreshCmds()
+    return refreshCmds() + configCmds()
 }
     
 def refreshCmds() {
@@ -313,7 +313,7 @@ def getTemperature(value) {
 	}
 
 private Map getLuminanceResult(rawValue) {
-	log.debug "Luminance rawValue = ${rawValue}"
+	//log.debug "Luminance rawValue = ${rawValue}"
 
 	if (luxOffset) {
 		def offset = luxOffset as int
@@ -391,7 +391,7 @@ private Map getBatteryResult(rawValue) {
  */
 
 private Map getSensitivityResult(value) {
-    log.trace "Sensitivity : " + value
+    // log.debug "getSensitivityResult : " + value
 	
     def sensitivityString = getSensitivityString(value)
     
@@ -406,7 +406,7 @@ private Map getSensitivityResult(value) {
 		translatable: true,
         isStateChange: true
 	]
-    log.debug "Sensitivity Result: {$result}"
+    // log.debug "Sensitivity Result: {$result}"
     return result
 }
 
@@ -418,7 +418,7 @@ private String getSensitivityString(value) {
 	parseCustomMessage
 */
 private Map parseCustomMessage(String description) {
-	log.trace "parseCustomMessage: ${ description }"
+	// log.trace "parseCustomMessage: ${ description }"
 	Map resultMap = [:]
 	if (description?.startsWith('temperature: ')) {
 		def value = zigbee.parseHATemperatureValue(description, "temperature: ", getTemperatureScale())
@@ -426,10 +426,10 @@ private Map parseCustomMessage(String description) {
 	}
     
     if (description?.startsWith('illuminance: ')) {
-    log.warn "parse illuminance:value: " + description.split(": ")[1]
+    //log.warn "parse illuminance:value: " + description.split(": ")[1]
 
 		def value = zigbee.lux( description.split(": ")[1] as Integer ) //zigbee.parseHAIlluminanceValue(description, "illuminance: ", getTemperatureScale())
-            log.warn "parse illuminance:proc: " + value
+            //log.warn "parse illuminance:proc: " + value
 		resultMap = getLuminanceResult(value)
 	}
 	return resultMap
@@ -439,7 +439,7 @@ private Map parseCustomMessage(String description) {
 	parseReportAttributeMessage
 */
 private List parseReportAttributeMessage(String description) {
-	log.trace "parseReportAttributeMessage: ${description}"
+	// log.trace "parseReportAttributeMessage: ${description}"
 	Map descMap = (description - "read attr - ").split(",").inject([:]) { map, param ->
 		def nameAndValue = param.split(":")
 		map += [(nameAndValue[0].trim()):nameAndValue[1].trim()]
@@ -479,8 +479,13 @@ private List parseReportAttributeMessage(String description) {
 		result << getSensitivityResult(Integer.parseInt(descMap.value, 16))
         
     }
+    else if (descMap.cluster == "0406" && descMap.attrId == "0010") {
+		log.trace "parsing PIROccupiedToUnoccupiedDelay:${descMap.value}"
+		// Nothing to do        
+    }
+
     else {
-     log.trace "Unhandled attribute: ${descMap.cluster} ${descMap.attrId} ${descMap.value}"
+     log.warn "Unhandled attribute: ${descMap.cluster} ${descMap.attrId} ${descMap.value}"
     }
 	return result
 }
