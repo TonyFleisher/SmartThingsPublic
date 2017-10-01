@@ -495,7 +495,7 @@ private List parseReportAttributeMessage(String description) {
 	parseCatchAllMessage
 */
 private Map parseCatchAllMessage(String description) {
-	log.trace "parseCatchallMessage: ${ description }"
+	//log.trace "parseCatchallMessage: ${ description }"
 
 	Map resultMap = [:]
 	def cluster = zigbee.parse(description)
@@ -576,7 +576,7 @@ private boolean shouldProcessMessage(cluster) {
 	cluster.command == 0x0B ||
 	(cluster.data.size() > 0 && cluster.data.first() == 0x3e)
     
-    log.trace "shouldProcess is: ${ !ignoredMessage}: ${cluster}"
+    //log.trace "shouldProcess is: ${ !ignoredMessage}: ${cluster}"
 	return !ignoredMessage
 }
 
