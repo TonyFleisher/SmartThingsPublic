@@ -8,16 +8,15 @@ definition(
     //parent: parent ? "TonyFleisher.MySmartHome-Alexa" : null,
     description: "Smart Home Controls",
     category: "My Apps",
-    //iconUrl: "https://raw.githubusercontent.com/MichaelStruck/SmartThingsPublic/master/smartapps/michaelstruck/ask-alexa.src/AskAlexa.png",
-    //iconX2Url: "https://raw.githubusercontent.com/MichaelStruck/SmartThingsPublic/master/smartapps/michaelstruck/ask-alexa.src/AskAlexa@2x.png",
-    //iconX3Url: "https://raw.githubusercontent.com/MichaelStruck/SmartThingsPublic/master/smartapps/michaelstruck/ask-alexa.src/AskAlexa@2x.png",
-  	oauth: true)
+        iconUrl: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience.png",
+        iconX2Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png",
+        	oauth: true)
   	
 preferences(oauthPage: pageOAuthDevices) { 
 	page name: "pageOAuthDevices"
 }
 
-dev pageOAuthDevices() { 
+def pageOAuthDevices() { 
 	dynamicPage (pageName: "oauthDevices", install: true, uninstall: false) {
 		section("Choose the devices to allow", hideWhenEmpty: true) {
 			input "myDevices", "capability.Actuator", title: "Choose Devices", multiple: true, required: false
