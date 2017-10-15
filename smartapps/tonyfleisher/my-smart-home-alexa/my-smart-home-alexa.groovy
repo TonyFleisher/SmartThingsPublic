@@ -13,11 +13,11 @@ definition(
     //iconX3Url: "https://raw.githubusercontent.com/MichaelStruck/SmartThingsPublic/master/smartapps/michaelstruck/ask-alexa.src/AskAlexa@2x.png",
   	oauth: true)
   	
-preferences(oauthPage: oauthDevices) { 
+preferences(oauthPage: pageOAuthDevices) { 
 	page name: "pageOAuthDevices"
 }
 
-dev pageOAuthDevices { 
+dev pageOAuthDevices() { 
 	dynamicPage (pageName: "oauthDevices", install: true, uninstall: false) {
 		section("Choose the devices to allow", hideWhenEmpty: true) {
 			input "myDevices", "capability.Actuator", title: "Choose Devices", multiple: true, required: false
