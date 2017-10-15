@@ -1,5 +1,5 @@
 definition(
-    name: "My SmartHome",
+    name: "My Smart Home Alexa",
     namespace: "TonyFleisher",
     //Change line below to 'false' to allow for multi app install (Advanced...see instructions)
     	singleInstance: true,
