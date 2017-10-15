@@ -17,7 +17,7 @@ preferences(oauthPage: pageOAuthDevices) {
 }
 
 def pageOAuthDevices() { 
-	dynamicPage (pageName: "pageOAuthDevices", install: true, uninstall: false) {
+	dynamicPage (name: "pageOAuthDevices", install: true, uninstall: false) {
 		section("Choose the devices to allow", hideWhenEmpty: true) {
 			input "myDevices", "capability.Actuator", title: "Choose Devices", multiple: true, required: false
 		}
