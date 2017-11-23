@@ -24,7 +24,7 @@ metadata {
 		capability "Refresh"
 		capability "Battery"
 
-		attribute "inc"
+		attribute "inc", "number"
 		command "setInc"
 	}
 
