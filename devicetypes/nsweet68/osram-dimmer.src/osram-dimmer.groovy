@@ -24,6 +24,8 @@ metadata {
 		capability "Refresh"
 		capability "Battery"
 
+		attribute "inc"
+		command "setInc"
 	}
 
 	// simulator metadata
@@ -55,6 +57,12 @@ metadata {
         valueTile("battery", "device.battery", decoration: "flat", inactiveLabel: false, width: 2, height: 2) {
             state "battery", label:'${currentValue}% battery'
         }
+
+		controlTile("levelSliderControl", "device.inc", "slider", height: 2,
+             width: 2, inactiveLabel: false, range:"(5..20)") {
+    			state "inc", action:"setInc"
+		}
+
 		standardTile("refresh", "device.power", inactiveLabel: false, decoration: "flat", width: 2, height: 2) {
 			state "default", label:'', action:"refresh.refresh", icon:"st.secondary.refresh"
 		}
@@ -82,6 +90,8 @@ def parse(String description) {
 }
 
 def configure() {
+  log.debug "Setting default inc to 20"
+  setInc(20)
   log.debug "Confuguring Reporting and Bindings."
   def configCmds = [
     // Bind the outgoing on/off cluster from remote to hub, so the hub receives messages when On/Off buttons pushed
@@ -134,10 +144,14 @@ private Map parseCatchAllMessage(String description) {
       def button = (msg.command == 1 ? 1 : 2)
       if (button == 1) {
       on()
+      state.pressed = 0
+      state.last = "down"
       } 
       else 
       {
       off()
+      state.pressed = 0
+      state.last = "down"
       }
       break
 
@@ -145,7 +159,9 @@ private Map parseCatchAllMessage(String description) {
       switch(msg.command) {
         case 1: // brightness decrease command
           state.pressed = 1   
-          adjDimmer(-20)
+          adjDimmer(state.inc * -1)
+          state.last = "down"
+          runIn(1, buttonHeld, [data: "down"])
           break
         case 3: 
            state.pressed = 0
@@ -153,7 +169,9 @@ private Map parseCatchAllMessage(String description) {
         break
         case 5: // brightness increase command
           state.pressed = 1
-		  adjDimmer(20)
+		  adjDimmer(state.inc)
+		  state.last = "up"
+          runIn(1, buttonHeld, [data: "up"])
           break
         }
   }
@@ -233,4 +251,39 @@ def adjDimmer(adj){
     setLevel(dimVal)
 
   
+}
+
+def setInc(val) { 
+	state.inc = val
+	sendEvent(name:"inc", value: val)
+}
+
+def buttonHeld(val) {
+	if (val == "down") {
+		log.debug "Held down"
+		holdDown()
+	} else if (val == "up") { 
+		log.debug "Held up"
+		holdUp()
+	} else {
+		log.debug "Unknown held: ${ val}"
+	}
+}
+
+def holdDown() {
+	if (state.pressed == 1 && state.last == "down") {
+		adjDimmer(state.inc * -1)
+		runIn(1, buttonHeld, [data: "down"])
+	} else {
+		log.debug "Hold Down canceled"
+	}
+}
+
+def holdUp() {
+	if (state.pressed == 1 && state.last == "up") {
+		adjDimmer(state.inc)
+		runIn(1, buttonHeld, [data: "up"])
+	} else {
+		log.debug "Hold Up canceled"
+	}
 }
