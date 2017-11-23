@@ -145,13 +145,13 @@ private Map parseCatchAllMessage(String description) {
       if (button == 1) {
       on()
       state.pressed = 0
-      state.last = "down"
+      state.lastButton = "down"
       } 
       else 
       {
       off()
       state.pressed = 0
-      state.last = "down"
+      state.lastButton = "down"
       }
       break
 
@@ -160,7 +160,7 @@ private Map parseCatchAllMessage(String description) {
         case 1: // brightness decrease command
           state.pressed = 1   
           adjDimmer(state.inc * -1)
-          state.last = "down"
+          state.lastButton = "down"
           runIn(1, buttonHeld, [data: [button:"down"]])
           break
         case 3: 
@@ -170,7 +170,7 @@ private Map parseCatchAllMessage(String description) {
         case 5: // brightness increase command
           state.pressed = 1
 		  adjDimmer(state.inc)
-		  state.last = "up"
+		  state.lastButton = "up"
           runIn(1, buttonHeld, [data: [button:"up"]])
           break
         }
@@ -271,7 +271,7 @@ def buttonHeld(data) {
 }
 
 def holdDown() {
-	if (state.pressed == 1 && state.last == "down") {
+	if (state.pressed == 1 && state.lastButton == "down") {
 		adjDimmer(state.inc * -1)
 		runIn(1, buttonHeld, [data: [button:"down"]])
 	} else {
@@ -280,7 +280,7 @@ def holdDown() {
 }
 
 def holdUp() {
-	if (state.pressed == 1 && state.last == "up") {
+	if (state.pressed == 1 && state.lastButton == "up") {
 		adjDimmer(state.inc)
 		runIn(1, buttonHeld, [data: [button:"up"]])
 	} else {
