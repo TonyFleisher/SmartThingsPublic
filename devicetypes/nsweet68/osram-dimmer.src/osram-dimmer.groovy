@@ -161,7 +161,7 @@ private Map parseCatchAllMessage(String description) {
           state.pressed = 1   
           adjDimmer(state.inc * -1)
           state.last = "down"
-          runIn(1, buttonHeld, [data: "down"])
+          runIn(1, buttonHeld, [data: [button:"down"]])
           break
         case 3: 
            state.pressed = 0
@@ -171,7 +171,7 @@ private Map parseCatchAllMessage(String description) {
           state.pressed = 1
 		  adjDimmer(state.inc)
 		  state.last = "up"
-          runIn(1, buttonHeld, [data: "up"])
+          runIn(1, buttonHeld, [data: [button:"up"]])
           break
         }
   }
@@ -258,22 +258,22 @@ def setInc(val) {
 	sendEvent(name:"inc", value: val)
 }
 
-def buttonHeld(val) {
-	if (val == "down") {
+def buttonHeld(data) {
+	if (data.button == "down") {
 		log.debug "Held down"
 		holdDown()
-	} else if (val == "up") { 
+	} else if (data.button == "up") { 
 		log.debug "Held up"
 		holdUp()
 	} else {
-		log.debug "Unknown held: ${ val}"
+		log.debug "Unknown held: ${ data}"
 	}
 }
 
 def holdDown() {
 	if (state.pressed == 1 && state.last == "down") {
 		adjDimmer(state.inc * -1)
-		runIn(1, buttonHeld, [data: "down"])
+		runIn(1, buttonHeld, [data: [button:"down"]])
 	} else {
 		log.debug "Hold Down canceled"
 	}
@@ -282,7 +282,7 @@ def holdDown() {
 def holdUp() {
 	if (state.pressed == 1 && state.last == "up") {
 		adjDimmer(state.inc)
-		runIn(1, buttonHeld, [data: "up"])
+		runIn(1, buttonHeld, [data: [button:"up"]])
 	} else {
 		log.debug "Hold Up canceled"
 	}
