@@ -25,6 +25,7 @@ metadata {
 		capability "Battery"
 
 		attribute "inc", "number"
+		attribute "lastButton", "string"
 		command "setInc"
 	}
 
@@ -143,15 +144,15 @@ private Map parseCatchAllMessage(String description) {
     case 6:
       def button = (msg.command == 1 ? 1 : 2)
       if (button == 1) {
-      on()
-      state.pressed = 0
-      state.lastButton = "down"
+      	on()
+      	state.pressed = 0
+		state.lastButton = "up"
       } 
       else 
       {
-      off()
-      state.pressed = 0
-      state.lastButton = "down"
+      	off()
+      	state.pressed = 0
+		state.lastButton = "down"
       }
       break
 
@@ -175,6 +176,8 @@ private Map parseCatchAllMessage(String description) {
           break
         }
   }
+  
+  return result
 }
 
 //obtained from other examples, converts battery message into event map
