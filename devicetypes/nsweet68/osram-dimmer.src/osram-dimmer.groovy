@@ -80,14 +80,14 @@ def parse(String description) {
 	log.debug "parse description: $description"
 	if (description?.startsWith('catchall:')) {
 		// call parseCatchAllMessage to parse the catchall message received
-		result << parseCatchAllMessage(description)
+		result += parseCatchAllMessage(description)
 	} else if (description?.startsWith('read')) {
 		// call parseReadMessage to parse the read message received
-		result << parseReadMessage(description)
+		result += parseReadMessage(description)
 	} else {
 		log.debug "Unknown message received: $description"
 	}
-	log.debug "Parse resul it: ${result}"
+	log.trace "Parse result is: ${result}"
 	//return event list
 	return result
 }
