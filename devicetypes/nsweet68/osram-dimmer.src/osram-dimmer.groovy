@@ -18,15 +18,16 @@
 
 metadata {
 	definition (name: "OSRAM Dimmer", namespace: "nsweet68", author: "nick@sweet-stuff.cc") {
+		capability "Actuator"
+		capability "Battery"
+		capability "Button"
+		capability "Holdable Button"
 		capability "Switch"
 		capability "Switch Level"
 		capability "Configuration"
 		capability "Refresh"
-		capability "Battery"
 
-		attribute "inc", "number"
 		attribute "lastButton", "string"
-		command "setInc"
 	}
 
 	// simulator metadata
@@ -59,40 +60,41 @@ metadata {
             state "battery", label:'${currentValue}% battery'
         }
 
-		controlTile("levelSliderControl", "device.inc", "slider", height: 2,
-             width: 2, inactiveLabel: false, range:"(5..20)") {
-    			state "inc", action:"setInc"
-		}
-
 		standardTile("refresh", "device.power", inactiveLabel: false, decoration: "flat", width: 2, height: 2) {
 			state "default", label:'', action:"refresh.refresh", icon:"st.secondary.refresh"
 		}
 		main "switch"
 		details(["switch", "level", "battery","levelSliderControl","refresh"])
 	}
+	preferences {
+	    input name: "dimmerRate", type: "number", title: "Dimmer Rate", description: "Amount to Adjust Level when button is held", required: true, displayDuringSetup: true
+		input name: "repeatHeld", type: "boolean", title: "Keep Held?", description: "If True, will send Held event and adjust level every second that button remains held", required: true, displayDuringSetup: true
+	}	
+	fingerprint profileId: "0104", deviceId: "0001", inClusters: "0000, 0001, 0003, 0020, 0402, 0B05", outClusters: "0003, 0006, 0008, 0019", manufacturer: "CentraLite", model: "3130", deviceJoinName: "CentraList/OSRAM Dimming Switch"
 }
 
 // Parse incoming device messages to generate events
 def parse(String description) {
 
-  Map map = [:]
+  def result = []
   log.debug "parse description: $description"
   if (description?.startsWith('catchall:')) {
     // call parseCatchAllMessage to parse the catchall message received
-    map = parseCatchAllMessage(description)
+    result << parseCatchAllMessage(description)
   } else if (description?.startsWith('read')) {
     // call parseReadMessage to parse the read message received
-    map = parseReadMessage(description)
+    result << parseReadMessage(description)
   } else {
     log.debug "Unknown message received: $description"
   }
-  //return event unless map is not set
-  return map 
+  log.debug "Parse resul it: ${result}"
+  //return event list
+  return result 
 }
 
 def configure() {
-  log.debug "Setting default inc to 20"
-  setInc(20)
+  log.debug "Setting default values: inc and numberOfButton"
+  setNumberOfButtons(2)
   log.debug "Confuguring Reporting and Bindings."
   def configCmds = [
     // Bind the outgoing on/off cluster from remote to hub, so the hub receives messages when On/Off buttons pushed
@@ -116,7 +118,7 @@ def refresh() {
   return refreshCmds
 }
 
-private Map parseReadMessage(String description) {
+def parseReadMessage(String description) {
   // Create a map from the message description to make parsing more intuitive
   def msg = zigbee.parseDescriptionAsMap(description)
   //def msg = zigbee.parse(description)
@@ -131,7 +133,9 @@ private Map parseReadMessage(String description) {
   return result
 }
 
-private Map parseCatchAllMessage(String description) {
+def parseCatchAllMessage(String description) {
+  def results = []
+  
   // Create a map from the raw zigbee message to make parsing more intuitive
   def msg = zigbee.parse(description)
   log.debug "Parse CatchAll $msg"
@@ -139,46 +143,54 @@ private Map parseCatchAllMessage(String description) {
     case 1:
       // call getBatteryResult method to parse battery message into event map
       log.info 'BATTERY MESSAGE'
-      def result = getBatteryResult(Integer.parseInt(msg.value, 16))
+       results << getBatteryResult(Integer.parseInt(msg.value, 16))
       break
     case 6:
+     // Pushed Events
       def button = (msg.command == 1 ? 1 : 2)
       if (button == 1) {
       	on()
       	state.pressed = 0
-		state.lastButton = "up"
+		state.lastButton = "button 1"
+		results << buttonEvent(button,"pushed")
       } 
       else 
       {
       	off()
       	state.pressed = 0
-		state.lastButton = "down"
+		state.lastButton = "button 2"
+		results << buttonEvent(button,"pushed")
       }
       break
 
     case 8:
+      // Held (and release) Events
       switch(msg.command) {
         case 1: // brightness decrease command
           state.pressed = 1   
-          adjDimmer(state.inc * -1)
-          state.lastButton = "down"
-          runIn(1, buttonHeld, [data: [button:"down"]])
+          adjDimmer(dimmerRate * -1)
+          state.lastButton = "button 2"
+		  results << buttonEvent(2,"held")
+		  scheduleIfNeeded(2)
           break
         case 3: 
            state.pressed = 0
            log.info "Received stop command"
+           results << createEvent(name: "release", value: "release", descriptionText: "${ state.lastButton} released", isStateChange: true)
         break
         case 5: // brightness increase command
           state.pressed = 1
-		  adjDimmer(state.inc)
-		  state.lastButton = "up"
-          runIn(1, buttonHeld, [data: [button:"up"]])
+		  adjDimmer(dimmerRate)
+		  state.lastButton = "button 1"
+		  results << buttonEvent(1,"held")
+		  scheduleIfNeeded(1)
           break
         }
   }
   
-  return result
+  return results
 }
+
 
 //obtained from other examples, converts battery message into event map
 private Map getBatteryResult(rawValue) {
@@ -208,10 +220,15 @@ private Map getBatteryResult(rawValue) {
   return result
 }
 
+def setNumberOfButtons(val) {
+	state.numberOfButtons = val
+	sendEvent(name:"numberOfButtons",value:2)
+}
+
 def on() {
 	sendEvent(name: "switch", value: "on")
     if (state.dimmer < 1) {
-    setLevel(10)
+    setLevel(dimmerRate)
     }
     log.info "Dimmer On"
 }
@@ -245,10 +262,9 @@ def setLevel(val){
     {
     	on()
     	sendEvent(name:"level",value:val)
-    	sendEvent(name:"switch.setLevel",value:val) // had to add this to work if apps subscribed to
-                                                    // setLevel event. "Dim With Me" was one.
     }
 }
+
 def adjDimmer(adj){
     def dimVal = state.dimmer + adj
     setLevel(dimVal)
@@ -256,16 +272,22 @@ def adjDimmer(adj){
   
 }
 
-def setInc(val) { 
-	state.inc = val
-	sendEvent(name:"inc", value: val)
+def buttonEvent(button,held) {
+	createEvent(name: "button", value: held, data: [buttonNumber: button], 
+		descriptionText: "$device.displayName button $button was $held", isStateChange: true)
+}
+
+def scheduleIfNeeded(button) {
+	if (repeatHeld) {
+		runIn(1, buttonHeld, [data: [button:button]])
+	}
 }
 
 def buttonHeld(data) {
-	if (data.button == "down") {
+	if (data.button == 2) {
 		log.debug "Held down"
 		holdDown()
-	} else if (data.button == "up") { 
+	} else if (data.button == 1) { 
 		log.debug "Held up"
 		holdUp()
 	} else {
@@ -274,19 +296,19 @@ def buttonHeld(data) {
 }
 
 def holdDown() {
-	if (state.pressed == 1 && state.lastButton == "down") {
-		adjDimmer(state.inc * -1)
-		runIn(1, buttonHeld, [data: [button:"down"]])
+	if (state.pressed == 1 && state.lastButton == "button 2") {
+		adjDimmer(dimmerRate * -1)
+		scheduleIfNeeded(2)
 	} else {
-		log.debug "Hold Down canceled"
+		log.debug "Hold Down stopped"
 	}
 }
 
 def holdUp() {
-	if (state.pressed == 1 && state.lastButton == "up") {
-		adjDimmer(state.inc)
-		runIn(1, buttonHeld, [data: [button:"up"]])
+	if (state.pressed == 1 && state.lastButton == "button 1") {
+		adjDimmer(dimmerRate)
+		scheduleIfNeeded(1)
 	} else {
-		log.debug "Hold Up canceled"
+		log.debug "Hold Up stopped"
 	}
 }
