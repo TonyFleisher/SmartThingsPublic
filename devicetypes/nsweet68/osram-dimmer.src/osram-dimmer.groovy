@@ -31,8 +31,9 @@ metadata {
 		capability "Configuration"
 		capability "Refresh"
 
-		attribute "lastButton", "string"
+		attribute "lastButton", "number"
 		attribute "release", "enum", ["release"]
+		attribute "lastAction", "string"
 	}
 
 	// simulator metadata
@@ -62,13 +63,17 @@ metadata {
 		standardTile("refresh", "device.power", inactiveLabel: false, decoration: "flat", width: 2, height: 2) {
 			state "default", label:'', action:"refresh.refresh", icon:"st.secondary.refresh"
 		}
+		valueTile("lastAction", "device.lastAction", width: 6, height: 2) {
+			state("lastAction", label:'${currentValue}')
+		}
 		main "switch"
 		details([
 			"switch",
 			"level",
 			"battery",
 			"levelSliderControl",
-			"refresh"
+			"refresh",
+			"lastAction"
 		])
 	}
 	preferences {
@@ -76,8 +81,7 @@ metadata {
 		input name: "repeatHeld", type: "boolean", title: "Keep Held?", description: "If True, will send Held event and adjust level while button remains held", required: true, displayDuringSetup: true
 		input name: "repeatRate", type: "number", range: "1..5", title: "Repeat Delay (1-5s)", description: "If Keep Held is true, how long to wait between updates while button is held", required: true, displayDuringSetup: true
 		input name: "setLevelMode", type: "enum", options: [[null:"No Level"], [pushed:"pushed"], [held:"held"]],
-						title: "Adjust level with push or held?", description:"Choose event that level is linked to", required: true, displayDuringSetup: true
-		input name: "heldIsOnOff", type: "boolean", title: "Turn on/off when held?", required: true, displayDuringSetup: true
+						title: "Adjust level with (none, push, or held)?", description:"Choose event that level is linked to; on/off will be linked to held if level is linked to pushed", required: true, displayDuringSetup: true
 	}
 	//fingerprint profileId: "0104", deviceId: "0001", inClusters: "0000, 0001, 0003, 0020, 0402, 0B05", outClusters: "0003, 0006, 0008, 0019", manufacturer: "CentraLite", model: "3130", deviceJoinName: "CentraList/OSRAM Dimming Switch"
 }
@@ -178,7 +182,7 @@ def parseCatchAllMessage(String description) {
 					on()
 				}
 				state.pressed = 0
-				state.lastButton = "button 1"
+				state.lastButton = button
 				results << buttonEvent(button,PUSHED)
 			}
 			else
@@ -192,7 +196,7 @@ def parseCatchAllMessage(String description) {
 					off()
 				}
 				state.pressed = 0
-				state.lastButton = "button 2"
+				state.lastButton = button
 				results << buttonEvent(button,PUSHED)
 			}
 			break
@@ -202,30 +206,29 @@ def parseCatchAllMessage(String description) {
 			switch(msg.command) {
 				case 1: // brightness decrease command
 					state.pressed = 1
-					state.lastButton = "button 2"
+					state.lastButton = button
 					results << buttonEvent(2,HELD)
 
 					if (setLevelMode == HELD)
 						adjDimmerDown()
-					if (heldIsOnOff && heldIsOnOff == "true")
+					if (setLevelMode == PUSHED)
 						off()
 					
 					scheduleIfNeeded(2)
 				break
 				case 3:
 					state.pressed = 0
-					def lastButtonNumber = ((state.lastButton).split())[1] as Integer
 					log.info "Received stop hold command"
-					results << createEvent(name: "release", value: "release", data: [buttonNumber: lastButtonNumber], descriptionText: "${state.lastButton} released", isStateChange: true)
+					results << createEvent(name: "release", value: "release", data: [buttonNumber: state.lastButton], descriptionText: "button ${state.lastButton} released", isStateChange: true)
 					break
 				case 5: // brightness increase command
 					state.pressed = 1
-					state.lastButton = "button 1"
+					state.lastButton = button
 					results << buttonEvent(1,HELD)
 					
 					if (setLevelMode == HELD)
 						adjDimmerUp()
-					if (heldIsOnOff && heldIsOnOff == "true")
+					if (setLevelMode == PUSHED)
 						on()
 					
 					scheduleIfNeeded(1)
@@ -325,6 +328,7 @@ def adjDimmer(adj){
 }
 
 def buttonEvent(button,held) {
+	sendEvent(name: "lastAction", value: "${button} ${held}", displayed:false)
 	createEvent(name: "button", value: held, data: [buttonNumber: button],
 		descriptionText: "$device.displayName button $button was $held", isStateChange: true)
 }
@@ -350,7 +354,7 @@ def buttonHeldScheduler(data) {
 
 def holdDown() {
 	def button = 2
-	if (state.pressed == 1 && state.lastButton == "button ${button}") {
+	if (state.pressed == 1 && state.lastButton == button) {
 		sendEvent(buttonEvent(button,HELD))
 		if (setLevelMode == HELD)
 			adjDimmerDown()
@@ -362,7 +366,7 @@ def holdDown() {
 
 def holdUp() {
 	def button = 1
-	if (state.pressed == 1 && state.lastButton == "button ${button}") {
+	if (state.pressed == 1 && state.lastButton == button) {
 		sendEvent(buttonEvent(button,HELD))
 		if (setLevelMode == HELD)
 			adjDimmerUp()
