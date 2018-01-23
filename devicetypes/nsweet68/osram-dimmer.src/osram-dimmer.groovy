@@ -15,6 +15,10 @@
  *  Thanks to Michael Hudson for OSRAM Lightify Dimming Switch device.
  *  Also borrowed pieces from Virtual Dimmer and GE/Jasco Dimmer
  */
+import groovy.transform.Field
+
+@Field final String PUSHED = 'pushed'
+@Field final String HELD = 'held'
 
 metadata {
 	definition (name: "OSRAM Dimmer", namespace: "nsweet68", author: "nick@sweet-stuff.cc") {
@@ -28,6 +32,7 @@ metadata {
 		capability "Refresh"
 
 		attribute "lastButton", "string"
+		attribute "release", "enum", ["release"]
 	}
 
 	// simulator metadata
@@ -68,9 +73,13 @@ metadata {
 	}
 	preferences {
 		input name: "dimmerRate", type: "number", title: "Dimmer Rate", description: "Amount to Adjust Level when button is held", required: true, displayDuringSetup: true
-		input name: "repeatHeld", type: "boolean", title: "Keep Held?", description: "If True, will send Held event and adjust level every second that button remains held", required: true, displayDuringSetup: true
+		input name: "repeatHeld", type: "boolean", title: "Keep Held?", description: "If True, will send Held event and adjust level while button remains held", required: true, displayDuringSetup: true
+		input name: "repeatRate", type: "number", range: "1..5", title: "Repeat Delay (1-5s)", description: "If Keep Held is true, how long to wait between updates while button is held", required: true, displayDuringSetup: true
+		input name: "setLevelMode", type: "enum", options: [[null:"No Level"], [pushed:"pushed"], [held:"held"]],
+						title: "Adjust level with push or held?", description:"Choose event that level is linked to", required: true, displayDuringSetup: true
+		input name: "heldIsOnOff", type: "boolean", title: "Turn on/off when held?", required: true, displayDuringSetup: true
 	}
-	fingerprint profileId: "0104", deviceId: "0001", inClusters: "0000, 0001, 0003, 0020, 0402, 0B05", outClusters: "0003, 0006, 0008, 0019", manufacturer: "CentraLite", model: "3130", deviceJoinName: "CentraList/OSRAM Dimming Switch"
+	//fingerprint profileId: "0104", deviceId: "0001", inClusters: "0000, 0001, 0003, 0020, 0402, 0B05", outClusters: "0003, 0006, 0008, 0019", manufacturer: "CentraLite", model: "3130", deviceJoinName: "CentraList/OSRAM Dimming Switch"
 }
 
 // Parse incoming device messages to generate events
@@ -105,6 +114,18 @@ def configure() {
 		"zdo bind 0x${device.deviceNetworkId} 0x01 0x01 0x0001 {${device.zigbeeId}} {}",
 	]
 	return configCmds
+}
+
+def updated() {
+	log.debug "Updated"
+	if (state.updatedLastRanAt && now() <= state.updatedLastRanAt + 5000) {
+		log.debug "skipping updating"
+		return null
+	}
+	state.updatedLastRanAt = now()
+	setNumberOfButtons(2)
+	def onOff = device.currentValue('switch')
+
 }
 
 def refresh() {
@@ -146,18 +167,33 @@ def parseCatchAllMessage(String description) {
 		case 6:
 		// Pushed Events
 			def button = (msg.command == 1 ? 1 : 2)
+			def onOff = device.currentValue('switch')
 			if (button == 1) {
-				on()
+				if (setLevelMode == PUSHED) {
+					if (onOff == "on")
+						adjDimmerUp()
+					else
+						on()
+				} else {
+					on()
+				}
 				state.pressed = 0
 				state.lastButton = "button 1"
-				results << buttonEvent(button,"pushed")
+				results << buttonEvent(button,PUSHED)
 			}
 			else
 			{
-				off()
+				if (setLevelMode == PUSHED) {
+					if (onOff == "on")
+						adjDimmerDown()
+					else
+						on()
+				} else {
+					off()
+				}
 				state.pressed = 0
 				state.lastButton = "button 2"
-				results << buttonEvent(button,"pushed")
+				results << buttonEvent(button,PUSHED)
 			}
 			break
 
@@ -166,21 +202,32 @@ def parseCatchAllMessage(String description) {
 			switch(msg.command) {
 				case 1: // brightness decrease command
 					state.pressed = 1
-					adjDimmer(dimmerRate * -1)
 					state.lastButton = "button 2"
-					results << buttonEvent(2,"held")
+					results << buttonEvent(2,HELD)
+
+					if (setLevelMode == HELD)
+						adjDimmerDown()
+					if (heldIsOnOff && heldIsOnOff == "true")
+						off()
+					
 					scheduleIfNeeded(2)
 				break
 				case 3:
 					state.pressed = 0
+					def lastButtonNumber = ((state.lastButton).split())[1] as Integer
 					log.info "Received stop hold command"
-					results << createEvent(name: "release", value: "release", descriptionText: "${state.lastButton} released", isStateChange: true)
+					results << createEvent(name: "release", value: "release", data: [buttonNumber: lastButtonNumber], descriptionText: "${state.lastButton} released", isStateChange: true)
 					break
 				case 5: // brightness increase command
 					state.pressed = 1
-					adjDimmer(dimmerRate)
 					state.lastButton = "button 1"
-					results << buttonEvent(1,"held")
+					results << buttonEvent(1,HELD)
+					
+					if (setLevelMode == HELD)
+						adjDimmerUp()
+					if (heldIsOnOff && heldIsOnOff == "true")
+						on()
+					
 					scheduleIfNeeded(1)
 					break
 			}
@@ -242,7 +289,6 @@ def setLevel(val){
 	// make sure we don't drive switches past allowed values (command will hang device waiting for it to
 	// execute. Never commes back)
 
-
 	if (val < 0){
 		val = 0
 	}
@@ -253,21 +299,29 @@ def setLevel(val){
 	state.dimmer = val
 
 	if (val == 0){ // I liked that 0 = off
-		sendEvent(name:"level",value:val)
-		off()
+		sendEvent(name:"level",value:state.dimmer)
+		if (device.currentValue("switch") == "on")
+			off()
 	}
 	else
 	{
-		on()
-		sendEvent(name:"level",value:val)
+		if (device.currentValue("switch") == "off")
+			on()
+		sendEvent(name:"level",value:state.dimmer)
 	}
+}
+
+def adjDimmerUp() {
+	adjDimmer(dimmerRate)
+}
+
+def adjDimmerDown() {
+	adjDimmer (-1 * dimmerRate)
 }
 
 def adjDimmer(adj){
 	def dimVal = state.dimmer + adj
 	setLevel(dimVal)
-
-
 }
 
 def buttonEvent(button,held) {
@@ -276,12 +330,13 @@ def buttonEvent(button,held) {
 }
 
 def scheduleIfNeeded(button) {
-	if (repeatHeld) {
-		runIn(1, buttonHeld, [data: [button:button]])
+	if (repeatHeld && repeatHeld == "true") {
+		log.debug "Scheduling held (${repeatHeld}) for ${button}"
+		runIn(repeatRate, buttonHeldScheduler, [data: [button:button]])
 	}
 }
 
-def buttonHeld(data) {
+def buttonHeldScheduler(data) {
 	if (data.button == 2) {
 		log.debug "Held down"
 		holdDown()
@@ -294,18 +349,24 @@ def buttonHeld(data) {
 }
 
 def holdDown() {
-	if (state.pressed == 1 && state.lastButton == "button 2") {
-		adjDimmer(dimmerRate * -1)
-		scheduleIfNeeded(2)
+	def button = 2
+	if (state.pressed == 1 && state.lastButton == "button ${button}") {
+		sendEvent(buttonEvent(button,HELD))
+		if (setLevelMode == HELD)
+			adjDimmerDown()
+		scheduleIfNeeded(button)
 	} else {
 		log.debug "Hold Down stopped"
 	}
 }
 
 def holdUp() {
-	if (state.pressed == 1 && state.lastButton == "button 1") {
-		adjDimmer(dimmerRate)
-		scheduleIfNeeded(1)
+	def button = 1
+	if (state.pressed == 1 && state.lastButton == "button ${button}") {
+		sendEvent(buttonEvent(button,HELD))
+		if (setLevelMode == HELD)
+			adjDimmerUp()
+		scheduleIfNeeded(button)
 	} else {
 		log.debug "Hold Up stopped"
 	}
